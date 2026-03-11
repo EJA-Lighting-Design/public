@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marin County Companies</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+  #header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #header h1 { font-size: 15px; font-weight: 600; color: #222; white-space: nowrap; }
+  #search { flex: 1; min-width: 160px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; outline: none; }
+  #search:focus { border-color: #888; }
+  #cat-filter { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; background: #fff; outline: none; }
+  #count { font-size: 12px; color: #888; white-space: nowrap; }
+  #map { height: calc(100vh - 110px); }
+  .legend { background: white; padding: 10px 14px; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.15); line-height: 1.8; font-size: 13px; }
+  .legend-title { font-weight: 600; margin-bottom: 4px; font-size: 13px; color: #333; }
+  .legend-item { display: flex; align-items: center; gap: 7px; cursor: pointer; padding: 1px 0; }
+  .legend-item:hover { opacity: 0.75; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-item.muted { opacity: 0.35; }
+  .popup-name { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
+  .popup-cat { font-size: 12px; color: #666; margin-bottom: 4px; }
+  .popup-addr { font-size: 12px; color: #444; margin-bottom: 4px; }
+  .popup-link a { font-size: 12px; color: #2563EB; text-decoration: none; }
+  .popup-link a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>Marin County Companies</h1>
+  <input id="search" type="text" placeholder="Search companies..." oninput="filterMarkers()">
+  <select id="cat-filter" onchange="filterMarkers()">
+    <option value="">All Categories</option>
+    <option value="Architect">Architect</option><option value="Audio / Video">Audio / Video</option><option value="General Contractor">General Contractor</option><option value="Interior Designer">Interior Designer</option><option value="Landscape Architect">Landscape Architect</option>
+  </select>
+  <span id="count"></span>
+</div>
+<div id="map"></div>
+
+<script>
+const companies = [
+  {
+    "name": "Alison Pickart Interior Design",
+    "category": "Interior Designer",
+    "address": "10 Bank Street, San Anselmo, CA 94960",
+    "website": "https://alisonpickart.com",
+    "lat": 37.975258,
+    "lon": -122.56117
+  },
+  {
+    "name": "Anja Michals Interior Design",
+    "category": "Interior Designer",
+    "address": "90 East Blithedale Ave, Mill Valley, CA 94941",
+    "website": "https://anjamichalsdesign.com",
+    "lat": 37.905537,
+    "lon": -122.54486
+  },
+  {
+    "name": "Ann Lowengart Interiors",
+    "category": "Interior Designer",
+    "address": "223 San Anselmo Avenue, Suite 7, San Anselmo, CA 94960",
+    "website": "https://annlowengart.com",
+    "lat": 37.97193,
+    "lon": -122.562035
+  },
+  {
+    "name": "Audio Visions",
+    "category": "Audio / Video",
+    "address": "100 Pelican Way, Suite B, San Rafael, CA 94901",
+    "website": "https://audiovisions.com",
+    "lat": 37.94991,
+    "lon": -122.49219
+  },
+  {
+    "name": "Barbra Bright Interiors",
+    "category": "Interior Designer",
+    "address": "1560 4th St, San Rafael, CA 94901",
+    "website": "https://barbrabrightdesign.com",
+    "lat": 37.974064,
+    "lon": -122.53595
+  },
+  {
+    "name": "Blasen Landscape Architecture",
+    "category": "Landscape Architect",
+    "address": "500 Red Hill Ave, San Anselmo, CA 94960",
+    "website": "https://blasengardens.com",
+    "lat": 37.97666,
+    "lon": -122.55895
+  },
+  {
+    "name": "Brockman Design Studio",
+    "category": "Architect",
+    "address": "25 San Anselmo Avenue, San Anselmo, CA 94960",
+    "website": "https://brockmandesignstudio.com",
+    "lat": 37.969822,
+    "lon": -122.5613
+  },
+  {
+    "name": "CM Natural Designs",
+    "category": "Interior Designer",
+    "address": "203 Flamingo Rd. #186, Mill Valley, CA 94941",
+    "website": "https://cmnaturaldesigns.com",
+    "lat": 37.880817,
+    "lon": -122.52564
+  },
+  {
+    "name": "Caitlin Jones Design",
+    "category": "Interior Designer",
+    "address": "12 E Sir Francis Drake Blvd Suite I, Larkspur, CA 94939",
+    "website": "https://caitlinjonesdesign.com",
+    "lat": 37.944546,
+    "lon": -122.51352
+  },
+  {
+    "name": "Caitlin Moran Interiors",
+    "category": "Interior Designer",
+    "address": "1 Blackfield Dr #310, Tiburon, CA 94920",
+    "website": "https://caitlinmoraninteriors.com",
+    "lat": 37.89888,
+    "lon": -122.50068
+  },
+  {
+    "name": "Chambers + Chambers",
+    "category": "Architect",
+    "address": "420 Miller Ave, Mill Valley, CA 94941",
+    "website": "https://chambersandchambers.com",
+    "lat": 37.89603,
+    "lon": -122.535866
+  },
+  {
+    "name": "Christopher Roy & Co.",
+    "category": "Interior Designer",
+    "address": "203 Tamal Vista Boulevard, #309, Corte Madera, CA 94925",
+    "website": "https://christopherroyandco.com",
+    "lat": 37.93654,
+    "lon": -122.51874
+  },
+  {
+    "name": "Dorman Associates",
+    "category": "Architect",
+    "address": "229 Flamingo Rd, Mill Valley, CA 94941",
+    "website": "https://dormanassociates.com",
+    "lat": 37.879776,
+    "lon": -122.524414
+  },
+  {
+    "name": "Elida Doldan Schujman Architecture Studio",
+    "category": "Architect",
+    "address": "316 Sycamore Ave, Mill Valley, CA 94941",
+    "website": "https://www.architecturestudioonline.com",
+    "lat": 37.89694,
+    "lon": -122.53213
+  },
+  {
+    "name": "Elizabeth Rose Jackson",
+    "category": "Interior Designer",
+    "address": "251 Sir Francis Drage Boulevard, San Anselmo, CA 94690",
+    "website": "https://elizabethrosejackson.com",
+    "lat": 37.975185,
+    "lon": -122.56221
+  },
+  {
+    "name": "Henrybuilt",
+    "category": "Architect",
+    "address": "356 Miller Ave, Mill Valley, CA 94941",
+    "website": "https://henrybuilt.com",
+    "lat": 37.897743,
+    "lon": -122.53785
+  },
+  {
+    "name": "Holder Parlette Architecture",
+    "category": "Architect",
+    "address": "1010 Sir Francis Drake Blvd. Suite 204, Kentfield, CA 94904",
+    "website": "https://holderparlette.com",
+    "lat": 37.95636,
+    "lon": -122.547905
+  },
+  {
+    "name": "Holscher Architecture",
+    "category": "Architect",
+    "address": "83 Beach Rd Suite B, Belvedere, CA 94920",
+    "website": "https://harch.com",
+    "lat": 37.873108,
+    "lon": -122.463326
+  },
+  {
+    "name": "IDF Studio",
+    "category": "Interior Designer",
+    "address": "110 Tiburon Blvd. Suite 3, Mill Valley, CA 94941",
+    "website": "https://idfstudio.com",
+    "lat": 37.901993,
+    "lon": -122.51103
+  },
+  {
+    "name": "JMJ Studios",
+    "category": "Architect",
+    "address": "980 Magnolia Avenue No. 2, Larkspur, CA 94939",
+    "website": "https://jmj-studios.com",
+    "lat": 37.946396,
+    "lon": -122.54522
+  },
+  {
+    "name": "Jennifer Robin Interiors",
+    "category": "Interior Designer",
+    "address": "15 Library Place, San Anselmo, CA 94960",
+    "website": "https://jrobininteriors.com",
+    "lat": 37.974827,
+    "lon": -122.563385
+  },
+  {
+    "name": "Jennifer Wundrow Interior Design",
+    "category": "Interior Designer",
+    "address": "534 Belle Avenue, San Rafael, CA 94901",
+    "website": "https://www.jenniferwundrow.com",
+    "lat": 37.97443,
+    "lon": -122.51712
+  },
+  {
+    "name": "Jerry Jacobs Design",
+    "category": "Interior Designer",
+    "address": "169 Stewart Drive, Tiburon, CA 94920",
+    "website": "https://jerryjacobsdesign.com",
+    "lat": 37.895944747396115,
+    "lon": -122.48418259999947
+  },
+  {
+    "name": "Julie Rootes Interiors",
+    "category": "Interior Designer",
+    "address": "215 Corte Madera Avenue, Corte Madera, CA 94925",
+    "website": "https://julierootes.com",
+    "lat": 37.925743,
+    "lon": -122.53013
+  },
+  {
+    "name": "Katie Monkhouse Interiors",
+    "category": "Interior Designer",
+    "address": "12 E Sir Francis Drake Blvd Suite C, Larkspur, California 94939",
+    "website": "https://katiemonkhouseinteriors.com",
+    "lat": 37.944546,
+    "lon": -122.51348
+  },
+  {
+    "name": "Kirley Architects",
+    "category": "Architect",
+    "address": "444 Magnolia Avenue, Suite 102, Larkspur, California 94939",
+    "website": "https://kirleyarchitects.com",
+    "lat": 37.93496,
+    "lon": -122.53525
+  },
+  {
+    "name": "Kress Jack",
+    "category": "Interior Designer",
+    "address": "35 Miller Ave, PMB 109, Mill Valley, CA 94941",
+    "website": "https://kressjack.com",
+    "lat": 37.905293,
+    "lon": -122.54709
+  },
+  {
+    "name": "Lauren Berry Interior Design",
+    "category": "Interior Designer",
+    "address": "22 Ross Common, Ross CA 94957",
+    "website": "https://www.laurenberry.com",
+    "lat": 37.960293,
+    "lon": -122.555664
+  },
+  {
+    "name": "Lauren Nelson Design",
+    "category": "Interior Designer",
+    "address": "368 San Anselmo Avenue, San Anselmo, CA 94960",
+    "website": "https://laurennelsondesign.com",
+    "lat": 37.973423,
+    "lon": -122.56209
+  },
+  {
+    "name": "Lincoln Lighthill Architect",
+    "category": "Architect",
+    "address": "35 Miller Avenue, #320, Mill Valley, CA 94941",
+    "website": "https://lincolnlighthill.com",
+    "lat": 37.90522,
+    "lon": -122.54697
+  },
+  {
+    "name": "Markoff Fullerton Architects",
+    "category": "Architect",
+    "address": "35 Miller Ave #401, Mill Valley, CA, 94941",
+    "website": "https://markoff-fullerton.com",
+    "lat": 37.90522,
+    "lon": -122.54697
+  },
+  {
+    "name": "Michael Heacock Architects",
+    "category": "Architect",
+    "address": "203 E. Blithedale Ave., Suite E, Mill Valley, CA 94941",
+    "website": "https://michaelheacock.com",
+    "lat": 37.90453,
+    "lon": -122.54244
+  },
+  {
+    "name": "Plath & Company",
+    "category": "General Contractor",
+    "address": "1575 Francisco Blvd. East, San Rafael, CA 94901",
+    "website": "https://plathco.com",
+    "lat": 37.9491,
+    "lon": -122.49333
+  },
+  {
+    "name": "Polsky Architects",
+    "category": "Architect",
+    "address": "469 Magnolia Ave. #B, Larkspur, CA 94939",
+    "website": "https://polskyarchitects.com",
+    "lat": 37.93557,
+    "lon": -122.53544
+  },
+  {
+    "name": "Prevalent Projects",
+    "category": "Interior Designer",
+    "address": "71 Throckmorton Ave., Mill Valley, CA 94941",
+    "website": "https://prevalentprojects.com",
+    "lat": 37.90653,
+    "lon": -122.54745
+  },
+  {
+    "name": "Richardson Pribuss Architects",
+    "category": "Architect",
+    "address": "447 Miller Avenue, Suite D, Mill Valley, CA 94941",
+    "website": "https://rp-architects.com",
+    "lat": 37.896027,
+    "lon": -122.53491
+  },
+  {
+    "name": "Rivet Interiors",
+    "category": "Interior Designer",
+    "address": "434 Throckmorton Ave, Mill Valley, CA 94941",
+    "website": "https://rivet-interiors.com",
+    "lat": 37.907387,
+    "lon": -122.55591
+  },
+  {
+    "name": "Ruth Livingston Studio",
+    "category": "Interior Designer",
+    "address": "74 Main St, Belvedere Tiburon, CA 94920",
+    "website": "https://ruthlivingston.com",
+    "lat": 37.873592,
+    "lon": -122.45772
+  },
+  {
+    "name": "SKS Architects",
+    "category": "Architect",
+    "address": "1850 Fourth Street, San Rafael, CA 94901",
+    "website": "https://sksarch.com",
+    "lat": 37.974373,
+    "lon": -122.54095
+  },
+  {
+    "name": "Sean Bailey Design",
+    "category": "Architect",
+    "address": "260B Magnolia Avenue, Larkspur, CA  94939",
+    "website": "https://seanbaileydesign.com",
+    "lat": 37.93316,
+    "lon": -122.53569
+  },
+  {
+    "name": "Stephen Willrich Design",
+    "category": "Architect",
+    "address": "2 Bank Street, San Anselmo, CA 94960",
+    "website": "https://stephenwillrich.com",
+    "lat": 37.97527,
+    "lon": -122.56156
+  },
+  {
+    "name": "Studio Green",
+    "category": "Landscape Architect",
+    "address": "232 Sir Francis Drake Blvd, San Anselmo, CA 94960",
+    "website": "https://studiogreen.com",
+    "lat": 37.97479,
+    "lon": -122.56168
+  },
+  {
+    "name": "Sutton Suzuki Architects",
+    "category": "Architect",
+    "address": "39 Forrest St., Suite 101, Mill Valley, CA 94941",
+    "website": "https://www.suttonsuzuki.com/",
+    "lat": 37.905636,
+    "lon": -122.54523
+  },
+  {
+    "name": "The Scale Collective",
+    "category": "Interior Designer",
+    "address": "Tiburon, CA",
+    "website": "https://thescalecollective.com",
+    "lat": 37.87312,
+    "lon": -122.46284
+  },
+  {
+    "name": "Together Home Design Studio",
+    "category": "Interior Designer",
+    "address": "223 San Anselmo Ave, Suite 1, San Anselmo, CA 94960",
+    "website": "https://togetherhome.com",
+    "lat": 37.971928,
+    "lon": -122.56204
+  },
+  {
+    "name": "Van Acker Construction",
+    "category": "General Contractor",
+    "address": "1060 Redwood Highway Frontage Road, Mill Valley, CA 94941",
+    "website": "https://vanacker.com",
+    "lat": 37.90649,
+    "lon": -122.51451
+  },
+  {
+    "name": "Wade Design Architects",
+    "category": "Architect",
+    "address": "29 Magnolia Ave, San Anselmo, CA 94960",
+    "website": "https://wade-design.com",
+    "lat": 37.97463,
+    "lon": -122.56441
+  }
+];
+const catColors = {"Architect": "#5483EB", "Audio / Video": "#808080", "General Contractor": "#92522B", "Interior Designer": "#EA763A", "Landscape Architect": "#2A6540"};
+
+const map = L.map('map').setView([37.94, -122.535], 12);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+  maxZoom: 19
+}).addTo(map);
+
+function makeIcon(color) {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30">'
+    + '<path d="M11 0C4.925 0 0 4.925 0 11c0 8.25 11 19.8 11 19.8S22 19.25 22 11C22 4.925 17.075 0 11 0z"'
+    + ' fill="' + color + '" stroke="white" stroke-width="1.5"/>'
+    + '<circle cx="11" cy="11" r="4.5" fill="white" fill-opacity="0.85"/></svg>';
+  return L.divIcon({ html: svg, className: '', iconSize: [22,30], iconAnchor: [11,30], popupAnchor: [0,-30] });
+}
+
+const markers = [];
+const hiddenCats = new Set();
+
+companies.forEach(c => {
+  const color = catColors[c.category] || '#888888';
+  const marker = L.marker([c.lat, c.lon], { icon: makeIcon(color) });
+  const website = c.website ? `<div class="popup-link"><a href="${c.website}" target="_blank">${c.website.replace(/^https?:\/\//, '')}</a></div>` : '';
+  marker.bindPopup(
+    `<div class="popup-name">${c.name}</div>` +
+    `<div class="popup-cat">${c.category}</div>` +
+    (c.address ? `<div class="popup-addr">${c.address}</div>` : '') +
+    website
+  );
+  marker._company = c;
+  markers.push(marker);
+  marker.addTo(map);
+});
+
+function filterMarkers() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const cat = document.getElementById('cat-filter').value;
+  let visible = 0;
+  markers.forEach(m => {
+    const c = m._company;
+    const matchQ = !q || c.name.toLowerCase().includes(q) || (c.address||'').toLowerCase().includes(q);
+    const matchCat = !cat || c.category === cat;
+    const matchLegend = !hiddenCats.has(c.category);
+    if (matchQ && matchCat && matchLegend) {
+      m.addTo(map);
+      visible++;
+    } else {
+      map.removeLayer(m);
+    }
+  });
+  document.getElementById('count').textContent = visible + ' of ' + companies.length + ' shown';
+}
+
+filterMarkers();
+
+// Legend
+const legendDiv = L.control({position: 'bottomright'});
+legendDiv.onAdd = function() {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = '<div class="legend-title">Category</div>';
+  Object.entries(catColors).forEach(([cat, color]) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${color}"></div><span>${cat}</span>`;
+    item.addEventListener('click', () => {
+      if (hiddenCats.has(cat)) hiddenCats.delete(cat);
+      else hiddenCats.add(cat);
+      item.classList.toggle('muted');
+      filterMarkers();
+    });
+    div.appendChild(item);
+  });
+  return div;
+};
+legendDiv.addTo(map);
+</script>
+</body>
+</html>
